@@ -304,10 +304,46 @@ class SentryGrid:
 # ---------------------------------------------------------------------------
 # Q4 贪心导航（题面 Q4·单步贪心导航策略）
 # ---------------------------------------------------------------------------
+def _greedy_candidates(pos, target, obstacles):
+    """返回让曼哈顿距离严格减小的合法方向。"""
+    x, y = pos
+    tx, ty = target
+    dx, dy = tx - x, ty - y
+    base = abs(dx) + abs(dy)
+    horizontal = []
+    if dx > 0:
+        horizontal.append(Facing.RIGHT)
+    elif dx < 0:
+        horizontal.append(Facing.LEFT)
+    vertical = []
+    if dy > 0:
+        vertical.append(Facing.UP)
+    elif dy < 0:
+        vertical.append(Facing.DOWN)
+    if base == 0:
+        return [], horizontal, vertical
+    if abs(dx) >= abs(dy):
+        ordered = horizontal + vertical
+    else:
+        ordered = vertical + horizontal
+    candidates = []
+    for direction in ordered:
+        ddx, ddy = direction.delta
+        nxt = (x + ddx, y + ddy)
+        if nxt in obstacles:
+            continue
+        if abs(nxt[0] - tx) + abs(nxt[1] - ty) < base:
+            candidates.append(direction)
+    return candidates, horizontal, vertical
+
+
 def next_step_toward(pos, target, obstacles, current_facing=Facing.UP):
-    """TODO(Q4)：返回下一步应朝向的 Facing；
-    候选判定、优先级与回退规则见题面 Q4 规范。"""
-    raise NotImplementedError("Q4 next_step_toward：题面 Q4·贪心策略与回退")
+    """返回下一步应朝向的 Facing；无候选时回退到 current_facing。"""
+    obstacles = obstacles or ()
+    candidates, _, _ = _greedy_candidates(pos, target, obstacles)
+    if not candidates:
+        return current_facing
+    return candidates[0]
 
 
 # ---------------------------------------------------------------------------
