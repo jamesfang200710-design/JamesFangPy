@@ -138,9 +138,52 @@ def _parse_json_line(line):
 
 
 def analyze_damage_log(lines):
-    """TODO(Q2)：解析混合格式伤害日志，返回固定契约的统计 dict；
-    行格式、去重与统计口径见题面 Q2 规范。"""
-    raise NotImplementedError("Q2 analyze_damage_log：题面 Q2·多源日志解析与统计")
+    """解析混合格式伤害日志，跳过脏行，返回固定契约的统计字典。"""
+    by_armor = {armor: 0 for armor in _ARMORS}
+    total = 0
+    events = 0
+    seen_ids = set()
+    try:
+        raw_lines = list(lines)
+    except TypeError:
+        raw_lines = []
+    for line in raw_lines:
+        if not isinstance(line, str):
+            continue
+        text = line.strip()
+        if not text or text.startswith("#"):
+            continue
+        if text.startswith("{"):
+            parsed = _parse_json_line(text)
+            if parsed is None:
+                continue
+            entries, ident = parsed
+            if ident is not None:
+                if ident in seen_ids:
+                    continue
+                seen_ids.add(ident)
+        else:
+            entries = _parse_sensor_line(text)
+            if not entries:
+                continue
+        for armor, damage in entries:
+            by_armor[armor] += damage
+            total += damage
+            events += 1
+    most_hit = None
+    if events:
+        peak = max(by_armor.values())
+        for armor in _ARMORS:
+            if by_armor[armor] == peak:
+                most_hit = armor
+                break
+    average = round(total / events, 2) if events else 0.0
+    return {
+        "total": total,
+        "by_armor": by_armor,
+        "most_hit": most_hit,
+        "avg": average,
+    }
 
 
 # ---------------------------------------------------------------------------
