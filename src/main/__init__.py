@@ -1,3 +1,4 @@
+# aim-py-cw
 # -*- coding: utf-8 -*-
 """AIM 2627 Python Coursework —— 哨兵 Sentry 控制模块（学生骨架）。
 
@@ -6,11 +7,10 @@
   渲染函数 render_frame（demo 用，不进测试）。
 - 你要实现：Q1-Q6 与 Bonus 的全部 TODO，以及 SentryGrid 的
   四个方法（current_pos 的 setter、move_forward、turn_left、turn_right）。
-- 未实现的函数 raise NotImplementedError：可见测试会自动 skip，
-  CI 一开始就是绿的；实现一个，对应测试亮一个。
 - `python main.py`（或 PYTHONPATH=src python -m main）可看 ASCII 演示。
 """
 import json
+from collections import deque
 from enum import Enum
 
 
@@ -31,12 +31,36 @@ class Facing(Enum):
         return self.value[0], self.value[1]
 
 
+_LEFT_OF = {
+    Facing.UP: Facing.LEFT,
+    Facing.LEFT: Facing.DOWN,
+    Facing.DOWN: Facing.RIGHT,
+    Facing.RIGHT: Facing.UP,
+}
+
+_RIGHT_OF = {target: source for source, target in _LEFT_OF.items()}
+
+
+def _manhattan(a, b):
+    """两个格子之间的曼哈顿距离。"""
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+
 # ---------------------------------------------------------------------------
 # Q1 机器人自检（题面 Q1·自检状态计算与报告生成）
 # ---------------------------------------------------------------------------
 def hp_ratio(hp, max_hp):
-    """TODO(Q1)：血量百分比，返回 0-100 的 int；计算与边界规则见题面 Q1 规范。"""
-    raise NotImplementedError("Q1 hp_ratio：题面 Q1·血量百分比与精度保障")
+    """血量百分比：0-100 的 int，整数截断，超界夹紧。"""
+    try:
+        hp = int(hp)
+        max_hp = int(max_hp)
+    except (TypeError, ValueError):
+        return 0
+    if max_hp <= 0 or hp <= 0:
+        return 0
+    if hp >= max_hp:
+        return 100
+    return hp * 100 // max_hp
 
 
 def status_report(name, robot_type, hp, max_hp, battery):
