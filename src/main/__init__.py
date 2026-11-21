@@ -64,8 +64,21 @@ def hp_ratio(hp, max_hp):
 
 
 def status_report(name, robot_type, hp, max_hp, battery):
-    """TODO(Q1)：一行自检报告字符串；档位判定与逐字符格式见题面 Q1 规范。"""
-    raise NotImplementedError("Q1 status_report：题面 Q1·电量映射与报告格式")
+    """一行自检报告：名称左对齐、机型居中、百分比右对齐。"""
+    ratio = hp_ratio(hp, max_hp)
+    try:
+        level = int(battery)
+    except (TypeError, ValueError):
+        level = 0
+    level = max(0, min(100, level))
+    if level >= 60:
+        tier = "OK"
+    elif level >= 20:
+        tier = "WARNING"
+    else:
+        tier = "LOW"
+    return "{:<10}|{:^10}|HP {:>3}%|BAT {:>3}%|{}".format(
+        str(name), str(robot_type), ratio, level, tier)
 
 
 # ---------------------------------------------------------------------------
