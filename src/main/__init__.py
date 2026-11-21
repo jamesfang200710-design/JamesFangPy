@@ -1,5 +1,3 @@
-# aim-py-cw
-# -*- coding: utf-8 -*-
 """AIM 2627 Python Coursework —— 哨兵 Sentry 控制模块（学生骨架）。
 
 你的全部作业都在本文件里：按题面（题面.pdf）各题的规范补全每个标有 TODO 的函数。
@@ -14,9 +12,6 @@ from collections import deque
 from enum import Enum
 
 
-# ---------------------------------------------------------------------------
-# 仿真世界基础（已提供，勿改）
-# ---------------------------------------------------------------------------
 class Facing(Enum):
     """朝向枚举。世界坐标 (x, y)：x 向右增长，y 向上增长（数学系）。"""
 
@@ -46,9 +41,6 @@ def _manhattan(a, b):
     return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
 
-# ---------------------------------------------------------------------------
-# Q1 机器人自检（题面 Q1·自检状态计算与报告生成）
-# ---------------------------------------------------------------------------
 def hp_ratio(hp, max_hp):
     """血量百分比：0-100 的 int，整数截断，超界夹紧。"""
     try:
@@ -81,9 +73,6 @@ def status_report(name, robot_type, hp, max_hp, battery):
         str(name), str(robot_type), ratio, level, tier)
 
 
-# ---------------------------------------------------------------------------
-# Q2 战斗日志分析（题面 Q2·多源日志解析与统计）
-# ---------------------------------------------------------------------------
 _ARMOR_BY_LETTER = {"F": "front", "L": "left", "R": "right"}
 _ARMORS = ("front", "left", "right")
 
@@ -186,9 +175,6 @@ def analyze_damage_log(lines):
     }
 
 
-# ---------------------------------------------------------------------------
-# Q3 SentryGrid（题面 Q3·载体物理规则）
-# ---------------------------------------------------------------------------
 class SentryGrid:
     """哨兵仿真载体（构造与只读属性已提供；四个 TODO 方法由你实现）。"""
 
@@ -198,7 +184,7 @@ class SentryGrid:
         self._height = int(height)
         if self._width <= 0 or self._height <= 0:
             raise ValueError("地图尺寸必须为正")
-        # 障碍坐标存入 set，查询 O(1)——已有实现，勿改。
+
         self._obstacles = set()
         for ob in obstacles:
             x, y = ob
@@ -225,7 +211,6 @@ class SentryGrid:
         y = max(0, min(self._height - 1, y))
         return (x, y)
 
-    # -- 只读属性（已提供，勿改） ------------------------------------------
     @property
     def width(self):
         return self._width
@@ -264,7 +249,6 @@ class SentryGrid:
         return ((x, y) in self._obstacles
                 or not (0 <= x < self._width and 0 <= y < self._height))
 
-    # -- 你要实现的部分 ------------------------------------------------------
     @property
     def current_pos(self):
         """当前位置 (x, y) 的 tuple。"""
@@ -301,9 +285,6 @@ class SentryGrid:
         return self._facing
 
 
-# ---------------------------------------------------------------------------
-# Q4 贪心导航（题面 Q4·单步贪心导航策略）
-# ---------------------------------------------------------------------------
 def _greedy_candidates(pos, target, obstacles):
     """返回让曼哈顿距离严格减小的合法方向。"""
     x, y = pos
@@ -346,9 +327,6 @@ def next_step_toward(pos, target, obstacles, current_facing=Facing.UP):
     return candidates[0]
 
 
-# ---------------------------------------------------------------------------
-# Q5 哨兵决策机（题面 Q5·裁判系统决策规则表）
-# ---------------------------------------------------------------------------
 class SentryState(Enum):
     """哨兵状态机（已提供，勿改）。"""
 
@@ -405,24 +383,23 @@ def decide(sensor, state, hp, heat):
 
     hp_pct = hp_ratio(hp, max_hp)
 
-    # R1 保命优先
     if hp_pct <= 30:
         return ("RETREAT", SentryState.RETREAT)
-    # R2 撤退保持：R1 已拦截低血量，到达这里即已恢复到安全血量
+
     if state is SentryState.RETREAT:
         return ("RETURN", SentryState.RETURN)
-    # R3 返航单帧
+
     if state is SentryState.RETURN:
         return ("MOVE_BASE", SentryState.PATROL)
-    # R4 交火决策
+
     if state is SentryState.ENGAGE:
         if visible:
             return _engage_target(distance, robot_type)
-        # R5 交火保持：最近两帧都没看到才算持续丢失
+
         if recent_seen:
             return ("HOLD_FIRE", SentryState.ENGAGE)
         return ("SCAN", SentryState.SUSPECT)
-    # R6 敌情确认 / R7 默认行为
+
     if visible:
         if len(frames) >= 2 and previous_visible:
             return _engage_target(distance, robot_type)
@@ -432,9 +409,6 @@ def decide(sensor, state, hp, heat):
     return ("SCAN", SentryState.SUSPECT)
 
 
-# ---------------------------------------------------------------------------
-# Q6 巡逻任务（题面 Q6·巡逻契约与验收阈值）
-# ---------------------------------------------------------------------------
 def _has_greedy_step(grid):
     """当前位置是否还能朝目标严格靠近一步。"""
     pos = grid.current_pos
@@ -523,7 +497,7 @@ def run_patrol(grid, max_steps=500):
             current = grid.current_pos
             seen[current] = seen.get(current, 0) + 1
             if seen[current] >= 2 and hand == "L":
-                # 左手规则绕回原格说明前方是环：换右手再试，避免死循环
+
                 hand = "R"
                 wall_steps = 0
                 seen = {current: 1}
@@ -552,9 +526,6 @@ def report_to_json(stats):
                       ensure_ascii=False)
 
 
-# ---------------------------------------------------------------------------
-# Bonus：BFS 全局最短路（题面 Bonus·BFS 语义与排行榜）
-# ---------------------------------------------------------------------------
 def bfs_path_length(start, target, obstacles):
     """返回全局最短路步数；同格 0，不可达 -1。"""
     obstacles = set(obstacles or ())
@@ -577,9 +548,6 @@ def bfs_path_length(start, target, obstacles):
     return -1
 
 
-# ---------------------------------------------------------------------------
-# 渲染（已提供，demo 专用，不进测试）
-# ---------------------------------------------------------------------------
 def render_frame(grid, trail=()):
     """ASCII 渲染一帧战场；trail 为走过的格子集合。返回 list[str]。"""
     trail = set(trail)
