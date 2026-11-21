@@ -435,10 +435,115 @@ def decide(sensor, state, hp, heat):
 # ---------------------------------------------------------------------------
 # Q6 巡逻任务（题面 Q6·巡逻契约与验收阈值）
 # ---------------------------------------------------------------------------
+def _has_greedy_step(grid):
+    """当前位置是否还能朝目标严格靠近一步。"""
+    pos = grid.current_pos
+    target = grid.enemy_pos
+    base = _manhattan(pos, target)
+    if base == 0:
+        return True
+    for direction in (Facing.UP, Facing.DOWN, Facing.LEFT, Facing.RIGHT):
+        dx, dy = direction.delta
+        nxt = (pos[0] + dx, pos[1] + dy)
+        if nxt in grid.obstacles:
+            continue
+        if _manhattan(nxt, target) < base:
+            return True
+    return False
+
+
+def _face(grid, direction):
+    """把朝向转到 direction（转 90° 的倍数，取较短的一侧）。"""
+    order = [Facing.UP, Facing.RIGHT, Facing.DOWN, Facing.LEFT]
+    diff = (order.index(direction) - order.index(grid.facing)) % 4
+    if diff == 3:
+        grid.turn_left()
+    else:
+        for _ in range(diff):
+            grid.turn_right()
+
+
 def run_patrol(grid, max_steps=500):
-    """TODO(Q6)：sense → decide → act 主循环；
-    循环结构、终止条件、脱困自由度与统计返回契约见题面 Q6 规范。"""
-    raise NotImplementedError("Q6 run_patrol：题面 Q6·主循环与统计契约")
+    """巡逻主循环：贪心前进，贪心失速时用沿墙脱困绕出死角。"""
+    target = grid.enemy_pos
+    trail = {grid.current_pos}
+    steps = 0
+    wall_mode = False
+    hand = "L"
+    wall_steps = 0
+    entry_distance = _manhattan(grid.current_pos, target)
+    limit = grid.width + grid.height
+    seen = {}
+
+    while steps < max_steps and grid.fuel > 0 and not grid.found_enemy:
+        pos = grid.current_pos
+        distance = _manhattan(pos, target)
+
+        if not wall_mode and not _has_greedy_step(grid):
+            wall_mode = True
+            hand = "L"
+            wall_steps = 0
+            entry_distance = distance
+            seen = {pos: 1}
+
+        if wall_mode:
+            side = _LEFT_OF[grid.facing] if hand == "L" else _RIGHT_OF[grid.facing]
+            opposite = (_RIGHT_OF[grid.facing] if hand == "L"
+                        else _LEFT_OF[grid.facing])
+            dx, dy = side.delta
+            side_free = not grid.is_blocked(pos[0] + dx, pos[1] + dy)
+            dx, dy = grid.facing.delta
+            ahead_free = not grid.is_blocked(pos[0] + dx, pos[1] + dy)
+            dx, dy = opposite.delta
+            opposite_free = not grid.is_blocked(pos[0] + dx, pos[1] + dy)
+            if side_free:
+                if hand == "L":
+                    grid.turn_left()
+                else:
+                    grid.turn_right()
+            elif not ahead_free:
+                if opposite_free:
+                    if hand == "L":
+                        grid.turn_right()
+                    else:
+                        grid.turn_left()
+                else:
+                    grid.turn_right()
+                    grid.turn_right()
+        else:
+            _face(grid, next_step_toward(pos, target, grid.obstacles,
+                                         grid.facing))
+
+        grid.move_forward()
+        steps += 1
+        trail.add(grid.current_pos)
+
+        if wall_mode:
+            wall_steps += 1
+            current = grid.current_pos
+            seen[current] = seen.get(current, 0) + 1
+            if seen[current] >= 2 and hand == "L":
+                # 左手规则绕回原格说明前方是环：换右手再试，避免死循环
+                hand = "R"
+                wall_steps = 0
+                seen = {current: 1}
+            if wall_steps > limit and hand == "L":
+                hand = "R"
+                wall_steps = 0
+            elif wall_steps > 2 * limit:
+                wall_mode = False
+            elif (_has_greedy_step(grid)
+                  and _manhattan(grid.current_pos, target) <= entry_distance):
+                wall_mode = False
+
+    found = grid.found_enemy
+    return {
+        "steps": steps,
+        "collisions": grid.collision_count,
+        "visited_count": len(trail),
+        "found_enemy": found,
+        "success": found,
+    }
 
 
 def report_to_json(stats):
