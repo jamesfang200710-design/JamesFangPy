@@ -84,6 +84,59 @@ def status_report(name, robot_type, hp, max_hp, battery):
 # ---------------------------------------------------------------------------
 # Q2 战斗日志分析（题面 Q2·多源日志解析与统计）
 # ---------------------------------------------------------------------------
+_ARMOR_BY_LETTER = {"F": "front", "L": "left", "R": "right"}
+_ARMORS = ("front", "left", "right")
+
+
+def _positive_int(text):
+    """把字符串解析为正整数；非纯数字或 <= 0 返回 None。"""
+    if not text or not text.isdigit():
+        return None
+    value = int(text)
+    return value if value > 0 else None
+
+
+def _parse_sensor_line(line):
+    """解析 "F:32,L:5,R:12"；任何一段非法则整行视为脏行。"""
+    events = []
+    for chunk in line.split(","):
+        chunk = chunk.strip()
+        if chunk.count(":") != 1:
+            return None
+        letter, number = chunk.split(":")
+        letter = letter.strip()
+        if letter not in _ARMOR_BY_LETTER:
+            return None
+        amount = _positive_int(number.strip())
+        if amount is None:
+            return None
+        events.append((_ARMOR_BY_LETTER[letter], amount))
+    return events or None
+
+
+def _parse_json_line(line):
+    """解析 JSON 行；返回 (events, ident)，非法返回 None。"""
+    try:
+        data = json.loads(line)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    armor = data.get("armor")
+    damage = data.get("damage")
+    if armor not in _ARMORS:
+        return None
+    if isinstance(damage, bool) or not isinstance(damage, int):
+        return None
+    if damage <= 0:
+        return None
+    ident = data.get("id")
+    if ident is not None:
+        if isinstance(ident, bool) or not isinstance(ident, int):
+            return None
+    return [(armor, damage)], ident
+
+
 def analyze_damage_log(lines):
     """TODO(Q2)：解析混合格式伤害日志，返回固定契约的统计 dict；
     行格式、去重与统计口径见题面 Q2 规范。"""
