@@ -359,10 +359,77 @@ class SentryState(Enum):
     RETURN = "RETURN"
 
 
+_DECIDE_FIELDS = ("enemy_frames", "enemy_dist", "robot_type", "max_hp")
+
+
+def _engage_target(dist, robot_type):
+    """R4/R6 共用的交火判定：近距离射击，远距离按机型横移。"""
+    if dist is not None and dist <= 3:
+        return ("SHOOT", SentryState.ENGAGE)
+    if robot_type == "HERO":
+        return ("MOVE_RIGHT", SentryState.ENGAGE)
+    return ("MOVE_LEFT", SentryState.ENGAGE)
+
+
 def decide(sensor, state, hp, heat):
-    """TODO(Q5)：纯函数决策，返回 (action: str, new_state: SentryState)；
-    sensor 字段契约、R1-R7 规则表与非法输入处理见题面 Q5 规范。"""
-    raise NotImplementedError("Q5 decide：题面 Q5·决策规则表 R1-R7")
+    """纯函数决策：按 R1-R7 顺序求值，首条命中即返回。"""
+    if not isinstance(sensor, dict):
+        raise ValueError("sensor 必须是字典")
+    for field in _DECIDE_FIELDS:
+        if field not in sensor:
+            raise ValueError("sensor 缺少字段: {}".format(field))
+    if not isinstance(state, SentryState):
+        raise ValueError("state 必须是 SentryState 成员")
+
+    frames = sensor["enemy_frames"]
+    if isinstance(frames, (str, bytes)) or not isinstance(frames, (tuple, list)):
+        raise ValueError("enemy_frames 必须是序列")
+    if not 1 <= len(frames) <= 6:
+        raise ValueError("enemy_frames 长度必须在 1..6")
+
+    visible = bool(frames[-1])
+    previous_visible = bool(frames[-2]) if len(frames) >= 2 else False
+    recent_seen = visible or previous_visible
+
+    distance = sensor["enemy_dist"]
+    if isinstance(distance, bool) or not isinstance(distance, int):
+        distance = None
+
+    robot_type = sensor["robot_type"]
+    if robot_type not in ("INFANTRY", "HERO"):
+        robot_type = "INFANTRY"
+
+    max_hp = sensor["max_hp"]
+    if isinstance(max_hp, bool) or not isinstance(max_hp, int) or max_hp <= 0:
+        max_hp = 100
+
+    hp_pct = hp_ratio(hp, max_hp)
+
+    # R1 保命优先
+    if hp_pct <= 30:
+        return ("RETREAT", SentryState.RETREAT)
+    # R2 撤退保持：R1 已拦截低血量，到达这里即已恢复到安全血量
+    if state is SentryState.RETREAT:
+        return ("RETURN", SentryState.RETURN)
+    # R3 返航单帧
+    if state is SentryState.RETURN:
+        return ("MOVE_BASE", SentryState.PATROL)
+    # R4 交火决策
+    if state is SentryState.ENGAGE:
+        if visible:
+            return _engage_target(distance, robot_type)
+        # R5 交火保持：最近两帧都没看到才算持续丢失
+        if recent_seen:
+            return ("HOLD_FIRE", SentryState.ENGAGE)
+        return ("SCAN", SentryState.SUSPECT)
+    # R6 敌情确认 / R7 默认行为
+    if visible:
+        if len(frames) >= 2 and previous_visible:
+            return _engage_target(distance, robot_type)
+        return ("SCAN", SentryState.SUSPECT)
+    if state is SentryState.PATROL:
+        return ("PATROL_MOVE", SentryState.PATROL)
+    return ("SCAN", SentryState.SUSPECT)
 
 
 # ---------------------------------------------------------------------------
